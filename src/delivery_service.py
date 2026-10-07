@@ -1,0 +1,48 @@
+import datetime
+
+
+def calculate_delivery_cost(weight: float, distance: int, package_type: str, is_express: bool = False) -> tuple:
+    """
+    Расчет стоимости и параметров доставки посылки (исправленная версия).
+    """
+
+    if weight < 0.1 or weight > 50.0 or distance < 1 or distance > 5000:
+        return -1, "0000-00-00"
+
+    # ИСПРАВЛЕНИЕ 1 - Нормализация регистра и пробелов
+    package_type = package_type.strip().lower()
+
+    valid_types = ["обычный", "хрупкий", "опасный"]
+    if package_type not in valid_types:
+        return -1, "0000-00-00"
+
+    base_cost = 200
+    distance_cost = distance * 5
+    total_cost = base_cost + distance_cost
+
+    # ИСПРАВЛЕНИЕ 2 - Включение границы ровно 5 кг
+    if weight >= 5.0 and weight < 20.0:
+        total_cost *= 1.2
+    elif weight >= 20.0:
+        total_cost *= 1.5
+
+    if package_type == "хрупкий":
+        total_cost += 300
+    elif package_type == "опасный":
+        total_cost += 1000
+
+    # ИСПРАВЛЕНИЕ 3 - Наценка 50% за экспресс-доставку вместо скидки
+    if is_express:
+        total_cost *= 1.5
+
+    current_date = datetime.date(2026, 9, 3)
+
+    days_needed = max(1, distance // 500)
+
+    # ИСПРАВЛЕНИЕ 4: Экспресс занимает минимум 1 рабочий день
+    if is_express:
+        days_needed = max(1, days_needed // 2)
+
+    delivery_date = current_date + datetime.timedelta(days=days_needed)
+
+    return int(total_cost), delivery_date.strftime("%Y-%m-%d")
