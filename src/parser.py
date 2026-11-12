@@ -25,14 +25,14 @@ class ForumParser:
         self.session.headers.update({"User-Agent": self.user_agent})
 
     def parse_html(self, html_content: str) -> List[Dict[str, Any]]:
-        """Разбираем готовый HTML и вытаскиваем посты: id, автора и текст сообщения."""
-        soup = BeautifulSoup(html_content, "html.parser")
+        """Разбираем HTML"""
+        soup = BeautifulSoup(html_content, "lxml")
         comments: List[Dict[str, Any]] = []
 
-        # На 4PDA посты обычно лежат в блоках с data-post, id="entryXXXX" или классом post_container
+        # в чем лежат посты:
         post_elements = soup.select("[data-post], div[id^='entry'], table[id^='entry'], .post_container")
 
-        # Запасной вариант, если на странице просто блоки с текстом постов
+        # запасной вариант
         if not post_elements:
             post_elements = soup.find_all(attrs={"class": re.compile(r"post_body|postcolor")})
 
@@ -40,7 +40,7 @@ class ForumParser:
         seen_ids = set()
 
         for el in post_elements:
-            # 1. Извлекаем ID поста
+            # 1. Извлечение ID поста
             comment_id = None
             if el.has_attr("data-post"):
                 raw_id = el["data-post"]
@@ -51,7 +51,7 @@ class ForumParser:
                 if digits:
                     comment_id = int(digits[0])
 
-            # Если в самом блоке ID нет, ищем внутреннюю ссылку/якорь на пост
+            # если в самом блоке ID нет, ищем внутреннюю ссылку на пост
             if comment_id is None:
                 anchor = el.find(attrs={"name": re.compile(r"^entry\d+$")}) or el.find(
                     "a", href=re.compile(r"#entry\d+")
@@ -65,7 +65,7 @@ class ForumParser:
             if comment_id is None or comment_id in seen_ids:
                 continue
 
-            # 2. Извлекаем никнейм автора
+            # 2. Извлечь никнейм автора
             name = None
             name_el = (
                 el.select_one(".normalname a, .normalname, .nickname, [data-author], .post-author a")
@@ -77,10 +77,10 @@ class ForumParser:
 
             if not name:
                 name = "Аноним"
-            # Обрезаем под лимит колонки в БД, если ник слишком длинный
+            # Обрезка
             name = name[: DatabaseRepository.MAX_NAME_LENGTH]
 
-            # 3. Извлекаем тело сообщения с сохранением тегов (жирный шрифт, курсив, ссылки)
+            # 3. Извлекаем тело сообщения с сохранением тегов
             body_el = el.select_one(".post_body, .postcolor, .post-content, .entry-content")
             if body_el is None:
                 if any("post_body" in cls or "postcolor" in cls for cls in el.get("class", [])):
@@ -118,7 +118,7 @@ class ForumParser:
         repository: DatabaseRepository,
         ignore_duplicates: bool = True,
     ) -> int:
-        """Сохраняем распарсенные посты в базу через DatabaseRepository.
+        """Сохраняем распаршенные посты в базу через DatabaseRepository.
 
         Если ignore_duplicates=True, посты с уже существующими ID пропускаем.
         """

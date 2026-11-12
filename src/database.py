@@ -10,16 +10,16 @@ class DatabaseRepository:
     MAX_MESSAGE_LENGTH = 8096
 
     def __init__(self, db_path: str = ":memory:") -> None:
-        # По умолчанию база создается в оперативной памяти (удобно для тестов)
+        # по умолчанию база создается в оперативной памяти
         self.db_path = db_path
         self.conn = sqlite3.connect(self.db_path)
         
-        # Чтобы получать строки не как кортежи, а как словари по именам колонок
+        # чтобы получать строки не как кортежи, а как словари по именам колонок
         self.conn.row_factory = sqlite3.Row
         self._create_table()
 
     def _create_table(self) -> None:
-        """Создаем таблицу comments, если она еще не создана."""
+        """создаем таблицу comments"""
         with self.conn:
             self.conn.execute(
                 """
@@ -76,7 +76,7 @@ class DatabaseRepository:
     def add(self, comment_id: int, username: str, message: str) -> bool:
         """Добавляем новый комментарий в базу.
 
-        При дубликате ID сам SQLite выбросит IntegrityError.
+        При дубликате ID SQLite сам выбросит IntegrityError.
         """
         self._validate_comment_id(comment_id)
         self._validate_username(username)

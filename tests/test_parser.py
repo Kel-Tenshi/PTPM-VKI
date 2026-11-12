@@ -22,7 +22,7 @@ class TestForumParser(unittest.TestCase):
         self.parser = ForumParser()
 
     def test_parse_html_extracts_all_posts(self) -> None:
-        """Парсер должен найти все 3 поста со слепка, их ID и ники авторов."""
+        # Парсер должен найти все 3 поста со слепка, их ID и ники авторов.
         posts = self.parser.parse_html(self.sample_html)
         self.assertEqual(len(posts), 3)
 
@@ -33,7 +33,7 @@ class TestForumParser(unittest.TestCase):
         self.assertEqual(names, ["Alice_Dev", "Bob_Tester", "Charlie_4PDA"])
 
     def test_parse_html_preserves_content_markup(self) -> None:
-        """Проверяем, что внутренняя HTML-разметка постов не теряется."""
+        # Проверяем, что внутренняя HTML-разметка постов не теряется.
         posts = self.parser.parse_html(self.sample_html)
 
         # Жирный текст в первом посте
@@ -44,7 +44,7 @@ class TestForumParser(unittest.TestCase):
         self.assertIn('<a href="https://4pda.to">Перейти</a>', posts[2]["message"])
 
     def test_save_to_db_integration(self) -> None:
-        """Проверяем передачу распарсенных данных в базу данных через репозиторий."""
+        # Проверяем передачу распарсенных данных в базу данных через репозиторий.
         repo = DatabaseRepository(":memory:")
         try:
             posts = self.parser.parse_html(self.sample_html)
@@ -72,7 +72,7 @@ class TestForumParser(unittest.TestCase):
 
     @patch("requests.Session.get")
     def test_parse_page_with_mocked_network(self, mock_get: MagicMock) -> None:
-        """Проверяем скачивание страницы: подстановку User-Agent и вызов get без реальной сети."""
+        # Проверяем скачивание страницы: подстановку User-Agent и вызов get без реальной сети.
         mock_response = MagicMock()
         mock_response.text = self.sample_html
         mock_response.status_code = 200
