@@ -15,6 +15,22 @@ class ForumParser:
         "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
     )
 
+    # Селекторы контейнеров одного сообщения.
+    # data-post / #entryNNN — современный 4PDA (IPB 4.x) и старый IPB 3.x.
+    POST_SELECTORS = (
+        "[data-post], div[id^='entry'], table[id^='entry'], .post_container"
+    )
+
+    # Селекторы автора. На живом 4PDA ник лежит в .post_nick a,
+    # остальные варианты оставлены для других движков и старых слепков.
+    AUTHOR_SELECTORS = (
+        ".post_nick a, .post_nick, .normalname a, .normalname, "
+        ".nickname, .post-author a"
+    )
+
+    # Селекторы тела сообщения.
+    BODY_SELECTORS = ".post_body, .postcolor, .post-content, .entry-content"
+
     def __init__(
         self,
         session: Optional[requests.Session] = None,
@@ -24,13 +40,26 @@ class ForumParser:
         self.user_agent = user_agent or self.DEFAULT_USER_AGENT
         self.session.headers.update({"User-Agent": self.user_agent})
 
+    @staticmethod
+    def _extract_author(node: Any) -> str:
+        """Достаем чистый ник из элемента автора.
+
+        На живом 4PDA в ссылку автора вшита иконка <i class="icon">ᵥ</i>,
+        а рядом лежит скрытое меню профиля (<ul class="dropdown-menu">) —
+        и то и другое попадает в get_text(), поэтому чистим копию узла.
+        """
+        clone = BeautifulSoup(str(node), "lxml")
+        for junk in clone.select("i.icon, .icon, .dropdown-menu, font"):
+            junk.decompose()
+        return " ".join(clone.get_text(" ", strip=True).split())
+
     def parse_html(self, html_content: str) -> List[Dict[str, Any]]:
-        """Разбираем HTML"""
+        """Разбираем HTML и возвращаем список постов: id, name, message."""
         soup = BeautifulSoup(html_content, "lxml")
         comments: List[Dict[str, Any]] = []
 
         # в чем лежат посты:
-        post_elements = soup.select("[data-post], div[id^='entry'], table[id^='entry'], .post_container")
+        post_elements = soup.select(self.POST_SELECTORS)
 
         # запасной вариант
         if not post_elements:
@@ -67,11 +96,9 @@ class ForumParser:
 
             # 2. Извлечь никнейм автора
             name = None
-            name_el = (
-                el.select_one(".normalname a, .normalname, .nickname, [data-author], .post-author a")
-            )
-            if name_el:
-                name = name_el.get_text(strip=True)
+            name_el = el.select_one(self.AUTHOR_SELECTORS)
+            if name_el is not None:
+                name = self._extract_author(name_el)
             elif el.has_attr("data-author"):
                 name = el["data-author"].strip()
 
@@ -81,7 +108,7 @@ class ForumParser:
             name = name[: DatabaseRepository.MAX_NAME_LENGTH]
 
             # 3. Извлекаем тело сообщения с сохранением тегов
-            body_el = el.select_one(".post_body, .postcolor, .post-content, .entry-content")
+            body_el = el.select_one(self.BODY_SELECTORS)
             if body_el is None:
                 if any("post_body" in cls or "postcolor" in cls for cls in el.get("class", [])):
                     body_el = el
