@@ -23,11 +23,6 @@ EXPECTED_NAMES = [
 
 
 def load_fixture(name: str = FIXTURE_NAME) -> str:
-    """Читаем сохраненную страницу и декодируем её по кодировке из самого HTML.
-
-    Файл лежит байт в байт как его отдал сервер (windows-1251), поэтому
-    сначала читаем байты, достаем charset из <meta> и только потом декодируем.
-    """
     path = os.path.join(os.path.dirname(__file__), "fixtures", name)
     with open(path, "rb") as f:
         raw = f.read()
@@ -38,25 +33,21 @@ def load_fixture(name: str = FIXTURE_NAME) -> str:
 
 
 class TestForumParser(unittest.TestCase):
-    """Тестируем парсер на сохраненном слепке реальной страницы 4PDA."""
 
     @classmethod
     def setUpClass(cls) -> None:
-        # Слепок читаем один раз на весь класс тестов, сеть не трогаем
+        # Слепок читаем один раз на весь класс тестов
         cls.sample_html = load_fixture()
 
     def setUp(self) -> None:
         self.parser = ForumParser()
 
     def test_parse_html_extracts_all_posts(self) -> None:
-        # Парсер должен найти все посты слепка и их ID в порядке страницы.
         posts = self.parser.parse_html(self.sample_html)
         self.assertEqual(len(posts), len(EXPECTED_IDS))
         self.assertEqual([p["id"] for p in posts], EXPECTED_IDS)
 
     def test_parse_html_extracts_authors(self) -> None:
-        # Регрессия на баг «все авторы Аноним»: ники берутся из .post_nick a,
-        # без служебной иконки <i class="icon"> и скрытого меню профиля.
         posts = self.parser.parse_html(self.sample_html)
         self.assertEqual([p["name"] for p in posts], EXPECTED_NAMES)
         # Иконка-галочка «ᵥ» из разметки 4PDA не должна попадать в ник
@@ -75,15 +66,15 @@ class TestForumParser(unittest.TestCase):
         self.assertIn("<br/>", posts[41171811]["message"])
 
     def test_parse_html_truncates_long_messages(self) -> None:
-        # Ограничение поля message в БД — 8096 символов, парсер обязан обрезать.
+        # Ограничение поля message в БД — 8096 символов
         posts = self.parser.parse_html(self.sample_html)
         for post in posts:
             self.assertLessEqual(len(post["message"]), DatabaseRepository.MAX_MESSAGE_LENGTH)
-        # Первый пост темы длиннее лимита, значит он обрезан ровно по лимиту
+
         self.assertEqual(len(posts[0]["message"]), DatabaseRepository.MAX_MESSAGE_LENGTH)
 
     def test_parse_html_author_fallback_is_anonymous(self) -> None:
-        # Если в разметке автора нет совсем — подставляем «Аноним», а не None.
+        # Если в разметке автора нет совсем — подставляем «Аноним», а не None
         html = '<div data-post="555">Текст без автора</div>'
         posts = self.parser.parse_html(html)
         self.assertEqual(len(posts), 1)
@@ -91,19 +82,17 @@ class TestForumParser(unittest.TestCase):
         self.assertIn("Текст без автора", posts[0]["message"])
 
     def test_save_to_db_integration(self) -> None:
-        # Проверяем передачу распарсенных данных в базу через репозиторий.
+        # Проверяем передачу распарсенных данных в базу через репозиторий
         repo = DatabaseRepository(":memory:")
         try:
             posts = self.parser.parse_html(self.sample_html)
             saved_count = self.parser.save_to_db(posts, repo)
             self.assertEqual(saved_count, len(EXPECTED_IDS))
 
-            # Первый пост читается из БД с теми же полями
             first = repo.get_by_id(EXPECTED_IDS[0])
             self.assertIsNotNone(first)
             self.assertEqual(first["name"], EXPECTED_NAMES[0])
 
-            # Все посты одного автора достаются по нику
             abush_posts = repo.get_by_name("Абуш")
             self.assertEqual([p["id"] for p in abush_posts], [41173103, 41173546, 41173556, 41173569])
 
