@@ -10,7 +10,6 @@ class DatabaseRepository:
     MAX_MESSAGE_LENGTH = 8096
 
     def __init__(self, db_path: str = ":memory:") -> None:
-        # по умолчанию база создается в оперативной памяти
         self.db_path = db_path
         self.conn = sqlite3.connect(self.db_path)
         

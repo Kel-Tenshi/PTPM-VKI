@@ -9,7 +9,7 @@ from .database import DatabaseRepository
 class ForumParser:
     """Парсер страниц форума (4PDA)."""
 
-    # User-Agent, чтобы сайт не блокировал запросы с 403
+    # User-Agent
     DEFAULT_USER_AGENT = (
         "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
         "(KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
@@ -21,8 +21,7 @@ class ForumParser:
         "[data-post], div[id^='entry'], table[id^='entry'], .post_container"
     )
 
-    # Селекторы автора. На живом 4PDA ник лежит в .post_nick a,
-    # остальные варианты оставлены для других движков и старых слепков.
+    # Селекторы автора.
     AUTHOR_SELECTORS = (
         ".post_nick a, .post_nick, .normalname a, .normalname, "
         ".nickname, .post-author a"
@@ -42,19 +41,12 @@ class ForumParser:
 
     @staticmethod
     def _extract_author(node: Any) -> str:
-        """Достаем чистый ник из элемента автора.
-
-        На живом 4PDA в ссылку автора вшита иконка <i class="icon">ᵥ</i>,
-        а рядом лежит скрытое меню профиля (<ul class="dropdown-menu">) —
-        и то и другое попадает в get_text(), поэтому чистим копию узла.
-        """
         clone = BeautifulSoup(str(node), "lxml")
         for junk in clone.select("i.icon, .icon, .dropdown-menu, font"):
             junk.decompose()
         return " ".join(clone.get_text(" ", strip=True).split())
 
     def parse_html(self, html_content: str) -> List[Dict[str, Any]]:
-        """Разбираем HTML и возвращаем список постов: id, name, message."""
         soup = BeautifulSoup(html_content, "lxml")
         comments: List[Dict[str, Any]] = []
 
@@ -69,7 +61,7 @@ class ForumParser:
         seen_ids = set()
 
         for el in post_elements:
-            # 1. Извлечение ID поста
+            # Извлечение ID поста
             comment_id = None
             if el.has_attr("data-post"):
                 raw_id = el["data-post"]
@@ -94,7 +86,7 @@ class ForumParser:
             if comment_id is None or comment_id in seen_ids:
                 continue
 
-            # 2. Извлечь никнейм автора
+            # Извлечь псевдоним автора
             name = None
             name_el = el.select_one(self.AUTHOR_SELECTORS)
             if name_el is not None:
@@ -104,10 +96,10 @@ class ForumParser:
 
             if not name:
                 name = "Аноним"
-            # Обрезка
+            # обрезка
             name = name[: DatabaseRepository.MAX_NAME_LENGTH]
 
-            # 3. Извлекаем тело сообщения с сохранением тегов
+            # Извлекаем тело сообщения с сохранением тегов
             body_el = el.select_one(self.BODY_SELECTORS)
             if body_el is None:
                 if any("post_body" in cls or "postcolor" in cls for cls in el.get("class", [])):
